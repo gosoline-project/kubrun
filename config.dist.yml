@@ -1,0 +1,15 @@
+env: dev
+
+app_project: gosoline
+app_family: gosoline
+app_group: test
+app_name: kubrun
+
+httpserver:
+  default:
+    port: 8890
+
+k8s:
+  client_mode: kube-config
+  context_name: k3d-justdev
+  namespace: kubrun

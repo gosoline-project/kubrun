@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "gosoline-kubrun",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

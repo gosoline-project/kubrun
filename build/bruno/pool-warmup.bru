@@ -1,0 +1,25 @@
+meta {
+  name: pool/warmup
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:8890/pool/warmup
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "pool_id": "goso",
+    "components": {
+      "mysql": 5
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
