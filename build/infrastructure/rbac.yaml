@@ -1,0 +1,26 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kubrun-operator
+  namespace: wiremock
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get","list","watch","create","update","patch","delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kubrun-operator-binding
+  namespace: wiremock
+subjects:
+  - kind: ServiceAccount
+    name: kubrun
+    namespace: wiremock
+roleRef:
+  kind: Role
+  name: kubrun-operator
+  apiGroup: rbac.authorization.k8s.io

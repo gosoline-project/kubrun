@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: http://localhost:8890/pool/warmup
+  url: http://{{endpoint}}/pool/warmup
   body: json
   auth: inherit
 }
@@ -14,7 +14,12 @@ body:json {
   {
     "pool_id": "goso",
     "components": {
-      "mysql": 5
+      "ddb": 3,
+      "localstack": 3,
+      "mysql": 3,
+      "redis": 3,
+      "s3": 3,
+      "wiremock": 3
     }
   }
 }

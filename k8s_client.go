@@ -139,6 +139,17 @@ func (c K8sClient) ListServices(ctx context.Context, selectors ...map[string]str
 	}), nil
 }
 
+func (c K8sClient) GetService(ctx context.Context, name string) (*apiv1.Service, error) {
+	var err error
+	var service *apiv1.Service
+
+	if service, err = c.services.Get(ctx, name, metav1.GetOptions{}); err != nil {
+		return nil, fmt.Errorf("could not get service: %w", err)
+	}
+
+	return service, nil
+}
+
 func (c K8sClient) CreateService(ctx context.Context, object *apiv1.Service) (*apiv1.Service, error) {
 	var err error
 	var service *apiv1.Service
@@ -156,6 +167,18 @@ func (c K8sClient) DeleteService(ctx context.Context, object Objecter) error {
 	}
 
 	return nil
+}
+
+func (c K8sClient) PatchService(ctx context.Context, object *apiv1.Service, ops []string) (*apiv1.Service, error) {
+	var err error
+	var service *apiv1.Service
+
+	patch := []byte(fmt.Sprintf("[%s]", strings.Join(ops, ",")))
+	if service, err = c.services.Patch(ctx, object.GetName(), types.JSONPatchType, patch, metav1.PatchOptions{}); err != nil {
+		return nil, fmt.Errorf("could not patch the service '%s': %w", object.GetName(), err)
+	}
+
+	return service, nil
 }
 
 func (k *K8sClient) getListOptions(selectors ...map[string]string) metav1.ListOptions {

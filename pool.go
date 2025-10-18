@@ -16,6 +16,26 @@ import (
 )
 
 var specs = map[string]ContainerSpec{
+	"ddb": {
+		Repository: "amazon/dynamodb-local",
+		Tag:        "2.5.4",
+		PortBindings: map[string]PortBinding{
+			"main": {
+				ContainerPort: 8000,
+				Protocol:      "tcp",
+			},
+		},
+	},
+	"localstack": {
+		Repository: "localstack/localstack",
+		Tag:        "4.1.0",
+		PortBindings: map[string]PortBinding{
+			"main": {
+				ContainerPort: 4566,
+				Protocol:      "tcp",
+			},
+		},
+	},
 	"mysql": {
 		Repository: "mysql/mysql-server",
 		Tag:        "8.0",
@@ -30,6 +50,45 @@ var specs = map[string]ContainerSpec{
 		PortBindings: map[string]PortBinding{
 			"main": {
 				ContainerPort: 3306,
+				Protocol:      "tcp",
+			},
+		},
+	},
+	"redis": {
+		Repository: "redis",
+		Tag:        "7-alpine",
+		PortBindings: map[string]PortBinding{
+			"main": {
+				ContainerPort: 6379,
+				Protocol:      "tcp",
+			},
+		},
+	},
+	"s3": {
+		Repository: "minio/minio",
+		Tag:        "RELEASE.2024-02-17T01-15-57Z",
+		Cmd: []string{
+			"server",
+			"/data",
+		},
+		Env: map[string]string{
+			"MINIO_ACCESS_KEY": "gosoline",
+			"MINIO_SECRET_KEY": "gosoline",
+		},
+		PortBindings: map[string]PortBinding{
+			"main": {
+				ContainerPort: 6379,
+				Protocol:      "tcp",
+			},
+		},
+	},
+	"wiremock": {
+		Repository: "wiremock/wiremock",
+		Tag:        "3.4.1",
+		Cmd:        []string{"--local-response-templating"},
+		PortBindings: map[string]PortBinding{
+			"main": {
+				ContainerPort: 8080,
 				Protocol:      "tcp",
 			},
 		},
@@ -56,12 +115,21 @@ func NewServicePool(logger log.Logger, k8sClient *K8sClient, id string) *Service
 }
 
 func (c *ServicePool) WarmUp(ctx context.Context, input *WarmUpInput) error {
+	var ok bool
+	var spec ContainerSpec
+
 	for componentType, count := range input.Components {
+		if spec, ok = specs[componentType]; !ok {
+			c.logger.Info(ctx, "no warm up spec found for component type %q: skipping", componentType)
+
+			continue
+		}
+
 		warmUp := &WarmUpDeployment{
 			PoolId:        input.PoolId,
 			ComponentType: componentType,
 			ContainerName: "main",
-			Spec:          specs[componentType],
+			Spec:          spec,
 		}
 
 		for i := 0; i < count; i++ {
@@ -85,6 +153,7 @@ func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1
 	var err error
 	var deployment *appsv1.Deployment
 	var deployments []*appsv1.Deployment
+	var service *apiv1.Service
 
 	labels := map[string]string{
 		LabelPoolId:        c.id,
@@ -109,7 +178,15 @@ func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1
 		deployment = deployments[0]
 	}
 
-	return c.claimDeployment(ctx, deployment, input)
+	if service, err = c.claimDeployment(ctx, deployment, input); err != nil {
+		return nil, fmt.Errorf("could not claim deployment: %w", err)
+	}
+
+	if _, err = c.spawnDeployment(ctx, input); err != nil {
+		return nil, fmt.Errorf("could not spawn deployment: %w", err)
+	}
+
+	return service, nil
 }
 
 func (c *ServicePool) ReleaseServices(ctx context.Context, labels map[string]string) error {
@@ -160,6 +237,11 @@ func (c *ServicePool) spawnDeployment(ctx context.Context, input SpawnAble) (*ap
 		return nil, fmt.Errorf("could not create deployment: %w", err)
 	}
 
+	service := c.factory.CreateService(uid, input)
+	if service, err = c.k8sClient.CreateService(ctx, service); err != nil {
+		return nil, fmt.Errorf("could not create service: %w", err)
+	}
+
 	c.logger.Info(ctx, "spawned deployment %q", deployment.Name)
 
 	return deployment, nil
@@ -167,6 +249,7 @@ func (c *ServicePool) spawnDeployment(ctx context.Context, input SpawnAble) (*ap
 
 func (c *ServicePool) claimDeployment(ctx context.Context, deployment *appsv1.Deployment, input *RunInput) (*apiv1.Service, error) {
 	var err error
+	var service *apiv1.Service
 
 	expireAfter := c.clock.Now().Add(input.ExpireAfter).Format("2006-01-02T15:04:05Z07:00")
 	ops := []string{
@@ -177,12 +260,15 @@ func (c *ServicePool) claimDeployment(ctx context.Context, deployment *appsv1.De
 	}
 
 	if deployment, err = c.k8sClient.PatchDeployment(ctx, deployment, ops); err != nil {
-		return nil, fmt.Errorf("could not claim deployment: %w", err)
+		return nil, fmt.Errorf("could not patch deployment: %w", err)
 	}
 
-	service := c.factory.CreateService(deployment, input)
-	if service, err = c.k8sClient.CreateService(ctx, service); err != nil {
-		return nil, fmt.Errorf("could not create service: %w", err)
+	if service, err = c.k8sClient.GetService(ctx, deployment.GetName()); err != nil {
+		return nil, fmt.Errorf("could not get service: %w", err)
+	}
+
+	if service, err = c.k8sClient.PatchService(ctx, service, ops); err != nil {
+		return nil, fmt.Errorf("could not patch service: %w", err)
 	}
 
 	c.logger.Info(ctx, "claimed deployment %q", deployment.Name)
