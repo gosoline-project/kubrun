@@ -9,8 +9,8 @@ RUN go mod download
 # Copy source
 COPY . .
 
-# Build static binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o kubrun .
+# Build static binary for target platform
+RUN go build -o kubrun .
 
 # Runtime image
 FROM alpine:3.20
