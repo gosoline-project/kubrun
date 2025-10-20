@@ -97,6 +97,19 @@ func (i RunInput) GetExpireAfter() time.Duration {
 	return i.ExpireAfter
 }
 
+type ExtendInput struct {
+	PoolId   string        `json:"pool_id"`
+	TestId   string        `json:"test_id"`
+	Duration time.Duration `json:"duration"`
+}
+
+func (i ExtendInput) GetLabels() map[string]string {
+	return map[string]string{
+		LabelPoolId: K8sNameString(i.PoolId),
+		LabelTestId: K8sNameString(i.TestId),
+	}
+}
+
 type StopInput struct {
 	PoolId string `json:"pool_id"`
 	TestId string `json:"test_id"`

@@ -1,11 +1,11 @@
 meta {
-  name: stop
+  name: extend
   type: http
-  seq: 3
+  seq: 6
 }
 
 post {
-  url: http://{{endpoint}}/stop
+  url: http://{{endpoint}}/extend
   body: json
   auth: inherit
 }
@@ -13,7 +13,8 @@ post {
 body:json {
   {
     "pool_id": "goso",
-    "test_id": "ef701bff"
+    "test_id": "ef701bff",
+    "duration": 60000000000
   }
 }
 

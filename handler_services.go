@@ -45,6 +45,14 @@ func (h *HandlerServices) HandleRun(ctx context.Context, input *RunInput) (https
 	return httpserver.NewJsonResponse(bindings), nil
 }
 
+func (h *HandlerServices) HandleExtend(ctx context.Context, input *ExtendInput) (httpserver.Response, error) {
+	if err := h.poolManager.ExtendServices(ctx, input); err != nil {
+		return nil, fmt.Errorf("could not extend service: %w", err)
+	}
+
+	return httpserver.NewStatusResponse(200), nil
+}
+
 func (h *HandlerServices) HandleStop(ctx context.Context, input *StopInput) (httpserver.Response, error) {
 	if err := h.poolManager.ReleaseServices(ctx, input); err != nil {
 		return nil, fmt.Errorf("could not fetch service: %w", err)

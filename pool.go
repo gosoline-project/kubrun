@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/justtrackio/gosoline/pkg/clock"
 	"github.com/justtrackio/gosoline/pkg/funk"
@@ -151,9 +153,12 @@ func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1
 	defer c.lck.Unlock()
 
 	var err error
-	var deployment *appsv1.Deployment
 	var deployments []*appsv1.Deployment
 	var service *apiv1.Service
+
+	if _, err = c.spawnDeployment(ctx, input); err != nil {
+		return nil, fmt.Errorf("could not spawn deployment: %w", err)
+	}
 
 	labels := map[string]string{
 		LabelPoolId:        c.id,
@@ -166,27 +171,52 @@ func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1
 		return nil, fmt.Errorf("failed to list deployments: %w", err)
 	}
 
-	deployments = funk.Filter(deployments, func(deployment *appsv1.Deployment) bool {
-		return deployment.Labels[LableIdle] == "true"
+	slices.SortFunc(deployments, func(a, b *appsv1.Deployment) int {
+		if a.CreationTimestamp.Before(&b.CreationTimestamp) {
+			return -1
+		}
+
+		return 1
 	})
 
-	if len(deployments) == 0 {
-		if deployment, err = c.spawnDeployment(ctx, input); err != nil {
-			return nil, fmt.Errorf("could not spawn deployment: %w", err)
-		}
-	} else {
-		deployment = deployments[0]
-	}
-
-	if service, err = c.claimDeployment(ctx, deployment, input); err != nil {
+	if service, err = c.claimDeployment(ctx, deployments[0], input); err != nil {
 		return nil, fmt.Errorf("could not claim deployment: %w", err)
 	}
 
-	if _, err = c.spawnDeployment(ctx, input); err != nil {
-		return nil, fmt.Errorf("could not spawn deployment: %w", err)
+	return service, nil
+}
+
+func (c *ServicePool) ExtendServices(ctx context.Context, input *ExtendInput) error {
+	var err error
+	var deployments []*appsv1.Deployment
+	var services []*apiv1.Service
+
+	expireAfter := c.clock.Now().Add(input.Duration).Format(time.RFC3339)
+	ops := []string{
+		fmt.Sprintf(`{"op": "replace", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationExpireAfter, "/", "~1"), expireAfter),
 	}
 
-	return service, nil
+	if deployments, err = c.k8sClient.ListDeployments(ctx, input.GetLabels()); err != nil {
+		return fmt.Errorf("could not list deployments: %w", err)
+	}
+
+	for _, deployment := range deployments {
+		if deployment, err = c.k8sClient.PatchDeployment(ctx, deployment, ops); err != nil {
+			return fmt.Errorf("could not patch deployment: %w", err)
+		}
+	}
+
+	if services, err = c.k8sClient.ListServices(ctx, input.GetLabels()); err != nil {
+		return fmt.Errorf("could not list services: %w", err)
+	}
+
+	for _, service := range services {
+		if service, err = c.k8sClient.PatchService(ctx, service, ops); err != nil {
+			return fmt.Errorf("could not patch service: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (c *ServicePool) ReleaseServices(ctx context.Context, labels map[string]string) error {
@@ -251,7 +281,7 @@ func (c *ServicePool) claimDeployment(ctx context.Context, deployment *appsv1.De
 	var err error
 	var service *apiv1.Service
 
-	expireAfter := c.clock.Now().Add(input.ExpireAfter).Format("2006-01-02T15:04:05Z07:00")
+	expireAfter := c.clock.Now().Add(input.ExpireAfter).Format(time.RFC3339)
 	ops := []string{
 		fmt.Sprintf(`{"op": "remove", "path": "/metadata/labels/%s"}`, strings.ReplaceAll(LableIdle, "/", "~1")),
 		fmt.Sprintf(`{"op": "add", "path": "/metadata/labels/%s", "value": "%s"}`, strings.ReplaceAll(LabelTestId, "/", "~1"), input.TestId),

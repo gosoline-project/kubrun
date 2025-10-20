@@ -11,6 +11,7 @@ import (
 func NewRouter(ctx context.Context, config cfg.Config, logger log.Logger, router *httpserver.Router) error {
 	router.HandleWith(httpserver.With(NewHandlerServices, func(router *httpserver.Router, handler *HandlerServices) {
 		router.POST("/run", httpserver.Bind(handler.HandleRun))
+		router.POST("/extend", httpserver.Bind(handler.HandleExtend))
 		router.POST("/stop", httpserver.Bind(handler.HandleStop))
 	}))
 

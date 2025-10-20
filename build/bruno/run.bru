@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: http://localhost:8890/run
+  url: http://{{endpoint}}/run
   body: json
   auth: inherit
 }
@@ -14,28 +14,17 @@ body:json {
   {
     "pool_id": "goso",
     "test_id": "ef701bff",
-    "component": "kafka",
-    "name": "default",
+    "component_type": "localstack",
+    "component_name": "default",
+    "container_name": "main",
     "spec": {
-      "repository": "docker.redpanda.com/redpandadata/redpanda",
-      "tag": "v24.2.20",
+      "repository": "localstack/localstack",
+      "tag": "4.1.0",
       "env": {},
-      "cmd": [
-        "redpanda start",
-        "--smp 1",
-        "--overprovisioned",
-        "--kafka-addr internal://0.0.0.0:19092",
-        "--advertise-kafka-addr internal://{{host}}:19092",
-        "--schema-registry-addr internal://0.0.0.0:18081",
-        "--mode dev-container"
-      ],
+      "cmd": [],
       "port_bindings": {
         "main": {
-          "container_port": 19092,
-          "protocol": "tcp"
-        },
-        "schema-registry": {
-          "container_port": 18081,
+          "container_port": 4566,
           "protocol": "tcp"
         }
       }

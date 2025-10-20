@@ -67,6 +67,12 @@ func (c *ServicePoolManager) FetchService(ctx context.Context, input *RunInput) 
 	return service, nil
 }
 
+func (c *ServicePoolManager) ExtendServices(ctx context.Context, input *ExtendInput) error {
+	pool := c.getPool(ctx, input.PoolId)
+
+	return pool.ExtendServices(ctx, input)
+}
+
 func (c *ServicePoolManager) ReleaseServices(ctx context.Context, input *StopInput) error {
 	pool := c.getPool(ctx, input.PoolId)
 
