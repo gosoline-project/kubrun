@@ -13,8 +13,7 @@ COPY . .
 RUN go build -o kubrun .
 
 # Runtime image
-FROM alpine:3.20
-RUN apk add --no-cache ca-certificates
+FROM gcr.io/distroless/static-debian12
 WORKDIR /app
 
 # Copy binary and config template
