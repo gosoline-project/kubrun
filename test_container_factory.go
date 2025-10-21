@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/justtrackio/gosoline/pkg/cfg"
 	"github.com/justtrackio/gosoline/pkg/mdl"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -14,9 +15,34 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-type ApplicationFactory struct{}
+type TestContainerSettings struct {
+	NodeSelector map[string]string         `cfg:"node_selector"`
+	Tolerations  []TestContainerToleration `cfg:"tolerations"`
+}
 
-func (f *ApplicationFactory) CreateDeployment(uid string, input SpawnAble) *appsv1.Deployment {
+type TestContainerToleration struct {
+	Key      string `cfg:"key"`
+	Operator string `cfg:"operator" default:"Equal"`
+	Value    string `cfg:"value"`
+	Effect   string `cfg:"effect"`
+}
+
+type TestContainerFactory struct {
+	settings *TestContainerSettings
+}
+
+func NewTestContainerFactory(config cfg.Config) (*TestContainerFactory, error) {
+	settings := &TestContainerSettings{}
+	if err := config.UnmarshalKey("testcontainers.default", settings); err != nil {
+		return nil, fmt.Errorf("can not unmarshal test container settings: %w", err)
+	}
+
+	return &TestContainerFactory{
+		settings: settings,
+	}, nil
+}
+
+func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *appsv1.Deployment {
 	spec := input.GetSpec()
 
 	container := apiv1.Container{
@@ -47,6 +73,21 @@ func (f *ApplicationFactory) CreateDeployment(uid string, input SpawnAble) *apps
 		})
 	}
 
+	nodeSelector := map[string]string{}
+	for key, value := range f.settings.NodeSelector {
+		key = strings.ReplaceAll(key, "\\", "")
+		nodeSelector[key] = value
+	}
+
+	tolerations := make([]apiv1.Toleration, 0)
+	for _, t := range f.settings.Tolerations {
+		tolerations = append(tolerations, apiv1.Toleration{
+			Key:    t.Key,
+			Value:  t.Value,
+			Effect: apiv1.TaintEffect(t.Effect),
+		})
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: K8sNameString("p", input.GetPoolId(), uid, input.GetComponentType(), input.GetContainerName()),
@@ -58,7 +99,9 @@ func (f *ApplicationFactory) CreateDeployment(uid string, input SpawnAble) *apps
 				LableIdle:          "true",
 			},
 			Annotations: map[string]string{
-				AnnotationExpireAfter: time.Now().Add(time.Hour).Format(time.RFC3339),
+				AnnotationComponentType: input.GetComponentType(),
+				AnnotationContainerName: input.GetContainerName(),
+				AnnotationExpireAfter:   time.Now().Add(time.Hour).Format(time.RFC3339),
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -81,7 +124,9 @@ func (f *ApplicationFactory) CreateDeployment(uid string, input SpawnAble) *apps
 					},
 				},
 				Spec: apiv1.PodSpec{
-					Containers: []apiv1.Container{container},
+					Containers:   []apiv1.Container{container},
+					NodeSelector: nodeSelector,
+					Tolerations:  tolerations,
 				},
 			},
 		},
@@ -90,7 +135,7 @@ func (f *ApplicationFactory) CreateDeployment(uid string, input SpawnAble) *apps
 	return deployment
 }
 
-func (f *ApplicationFactory) CreateService(uid string, input SpawnAble) *apiv1.Service {
+func (f *TestContainerFactory) CreateService(uid string, input SpawnAble) *apiv1.Service {
 	spec := input.GetSpec()
 
 	ports := make([]apiv1.ServicePort, 0)
@@ -114,7 +159,9 @@ func (f *ApplicationFactory) CreateService(uid string, input SpawnAble) *apiv1.S
 				LableIdle:          "true",
 			},
 			Annotations: map[string]string{
-				AnnotationExpireAfter: time.Now().Add(time.Hour).Format(time.RFC3339),
+				AnnotationComponentType: input.GetComponentType(),
+				AnnotationContainerName: input.GetContainerName(),
+				AnnotationExpireAfter:   time.Now().Add(time.Hour).Format(time.RFC3339),
 			},
 		},
 		Spec: apiv1.ServiceSpec{

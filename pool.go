@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/justtrackio/gosoline/pkg/cfg"
 	"github.com/justtrackio/gosoline/pkg/clock"
 	"github.com/justtrackio/gosoline/pkg/funk"
 	"github.com/justtrackio/gosoline/pkg/log"
@@ -101,19 +102,26 @@ type ServicePool struct {
 	lck       sync.RWMutex
 	logger    log.Logger
 	k8sClient *K8sClient
-	factory   *ApplicationFactory
+	factory   *TestContainerFactory
 	id        string
 	clock     clock.Clock
 }
 
-func NewServicePool(logger log.Logger, k8sClient *K8sClient, id string) *ServicePool {
+func NewServicePool(config cfg.Config, logger log.Logger, k8sClient *K8sClient, id string) (*ServicePool, error) {
+	var err error
+	var factory *TestContainerFactory
+
+	if factory, err = NewTestContainerFactory(config); err != nil {
+		return nil, fmt.Errorf("could not create test container factory: %w", err)
+	}
+
 	return &ServicePool{
 		logger:    logger.WithChannel("pool").WithFields(log.Fields{"pool-id": id}),
 		k8sClient: k8sClient,
-		factory:   &ApplicationFactory{},
+		factory:   factory,
 		id:        id,
 		clock:     clock.NewRealClock(),
-	}
+	}, nil
 }
 
 func (c *ServicePool) WarmUp(ctx context.Context, input *WarmUpInput) error {
@@ -260,7 +268,7 @@ func (c *ServicePool) ReleaseServices(ctx context.Context, labels map[string]str
 
 func (c *ServicePool) spawnDeployment(ctx context.Context, input SpawnAble) (*appsv1.Deployment, error) {
 	var err error
-	uid := uuid.New().NewV4()[0:8]
+	uid := uuid.New().NewV4()
 
 	deployment := c.factory.CreateDeployment(uid, input)
 	if deployment, err = c.k8sClient.CreateDeployment(ctx, deployment); err != nil {
@@ -285,8 +293,11 @@ func (c *ServicePool) claimDeployment(ctx context.Context, deployment *appsv1.De
 	ops := []string{
 		fmt.Sprintf(`{"op": "remove", "path": "/metadata/labels/%s"}`, strings.ReplaceAll(LableIdle, "/", "~1")),
 		fmt.Sprintf(`{"op": "add", "path": "/metadata/labels/%s", "value": "%s"}`, strings.ReplaceAll(LabelTestId, "/", "~1"), input.TestId),
-		fmt.Sprintf(`{"op": "add", "path": "/metadata/labels/%s", "value": "%s"}`, strings.ReplaceAll(LabelComponentName, "/", "~1"), input.ComponentName),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationComponentType, "/", "~1"), input.GetComponentType()),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationComponentName, "/", "~1"), input.GetComponentName()),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationContainerName, "/", "~1"), input.GetContainerName()),
 		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationExpireAfter, "/", "~1"), expireAfter),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationTestName, "/", "~1"), input.TestName),
 	}
 
 	if deployment, err = c.k8sClient.PatchDeployment(ctx, deployment, ops); err != nil {

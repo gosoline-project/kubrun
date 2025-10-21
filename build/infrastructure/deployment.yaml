@@ -2,11 +2,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kubrun
-  namespace: wiremock
+  namespace: kubrun
   labels:
     app: kubrun
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: kubrun
@@ -18,17 +18,12 @@ spec:
       serviceAccountName: kubrun
       containers:
         - name: kubrun
-          image: ghcr.io/gosoline-project/kubrun:latest
+          image: ghcr.io/gosoline-project/kubrun:main-36d5618
           imagePullPolicy: IfNotPresent
-          env:
-            - name: K8S_CLIENT_MODE
-              value: in-cluster
-            - name: K8S_NAMESPACE
-              value: wiremock
           ports:
             - containerPort: 8890
               name: http
-          args: []
+          args: ["--config=config.yml"]
           livenessProbe:
             httpGet:
               path: /health
@@ -48,3 +43,14 @@ spec:
             limits:
               cpu: 250m
               memory: 256Mi
+          volumeMounts:
+            - name: kubrun-config
+              mountPath: /app/config.yml
+              subPath: config.yml
+      volumes:
+        - name: kubrun-config
+          configMap:
+            name: kubrun-config
+            items:
+              - key: config.yml
+                path: config.yml

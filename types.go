@@ -3,7 +3,11 @@ package main
 import "time"
 
 const (
-	AnnotationExpireAfter = "kubrun/expire-after"
+	AnnotationComponentType = "kubrun/component-type"
+	AnnotationComponentName = "kubrun/component-name"
+	AnnotationContainerName = "kubrun/container-name"
+	AnnotationExpireAfter   = "kubrun/expire-after"
+	AnnotationTestName      = "kubrun/test-name"
 
 	LabelPoolId        = "kubrun/pool-id"
 	LabelTestId        = "kubrun/test-id"
@@ -57,6 +61,7 @@ func (i WarmUpDeployment) GetSpec() ContainerSpec {
 type RunInput struct {
 	PoolId        string        `json:"pool_id"`
 	TestId        string        `json:"test_id"`
+	TestName      string        `json:"test_name"`
 	ComponentType string        `json:"component_type"`
 	ComponentName string        `json:"component_name"`
 	ContainerName string        `json:"container_name"`
@@ -70,6 +75,10 @@ func (i RunInput) GetPoolId() string {
 
 func (i RunInput) GetComponentType() string {
 	return i.ComponentType
+}
+
+func (i RunInput) GetComponentName() string {
+	return i.ComponentName
 }
 
 func (i RunInput) GetContainerName() string {

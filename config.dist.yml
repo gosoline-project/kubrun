@@ -13,3 +13,8 @@ k8s:
   client_mode: kube-config
   context_name: k3d-justdev
   namespace: kubrun
+
+testcontainers:
+  default:
+    node_selector: {}
+    tolerations: []

@@ -24,8 +24,8 @@ func ProvideServicePoolManager(ctx context.Context, config cfg.Config, logger lo
 			return nil, fmt.Errorf("could not create k8s client: %w", err)
 		}
 
-		poolFactory := func(id string) *ServicePool {
-			return NewServicePool(logger, k8sClient, id)
+		poolFactory := func(id string) (*ServicePool, error) {
+			return NewServicePool(config, logger, k8sClient, id)
 		}
 
 		return &ServicePoolManager{
@@ -41,25 +41,41 @@ type ServicePoolManager struct {
 	lck         sync.RWMutex
 	logger      log.Logger
 	k8sClient   *K8sClient
-	poolFactory func(id string) *ServicePool
+	poolFactory func(id string) (*ServicePool, error)
 	pools       map[string]*ServicePool
 }
 
 func (c *ServicePoolManager) WarmUpPool(ctx context.Context, input *WarmUpInput) error {
-	pool := c.getPool(ctx, input.PoolId)
+	var err error
+	var pool *ServicePool
+
+	if pool, err = c.getPool(ctx, input.PoolId); err != nil {
+		return fmt.Errorf("could not get pool: %w", err)
+	}
+
 	return pool.WarmUp(ctx, input)
 }
 
 func (c *ServicePoolManager) ShutdownPool(ctx context.Context, input *ShutdownInput) error {
-	pool := c.getPool(ctx, input.PoolId)
+	var err error
+	var pool *ServicePool
+
+	if pool, err = c.getPool(ctx, input.PoolId); err != nil {
+		return fmt.Errorf("could not get pool: %w", err)
+	}
+
 	return pool.Shutdown(ctx)
 }
 
 func (c *ServicePoolManager) FetchService(ctx context.Context, input *RunInput) (*apiv1.Service, error) {
 	var err error
+	var pool *ServicePool
 	var service *apiv1.Service
 
-	pool := c.getPool(ctx, input.PoolId)
+	if pool, err = c.getPool(ctx, input.PoolId); err != nil {
+		return nil, fmt.Errorf("could not get pool: %w", err)
+	}
+
 	if service, err = pool.ClaimService(ctx, input); err != nil {
 		return nil, fmt.Errorf("could not claim service: %w", err)
 	}
@@ -68,13 +84,23 @@ func (c *ServicePoolManager) FetchService(ctx context.Context, input *RunInput) 
 }
 
 func (c *ServicePoolManager) ExtendServices(ctx context.Context, input *ExtendInput) error {
-	pool := c.getPool(ctx, input.PoolId)
+	var err error
+	var pool *ServicePool
+
+	if pool, err = c.getPool(ctx, input.PoolId); err != nil {
+		return fmt.Errorf("could not get pool: %w", err)
+	}
 
 	return pool.ExtendServices(ctx, input)
 }
 
 func (c *ServicePoolManager) ReleaseServices(ctx context.Context, input *StopInput) error {
-	pool := c.getPool(ctx, input.PoolId)
+	var err error
+	var pool *ServicePool
+
+	if pool, err = c.getPool(ctx, input.PoolId); err != nil {
+		return fmt.Errorf("could not get pool: %w", err)
+	}
 
 	return pool.ReleaseServices(ctx, input.GetLabels())
 }
@@ -110,25 +136,30 @@ func (c *ServicePoolManager) ExpireServices(ctx context.Context) error {
 	return nil
 }
 
-func (c *ServicePoolManager) getPool(ctx context.Context, poolId string) *ServicePool {
+func (c *ServicePoolManager) getPool(ctx context.Context, poolId string) (*ServicePool, error) {
 	c.lck.Lock()
 	defer c.lck.Unlock()
 
 	var ok bool
 	var pool *ServicePool
 
-	if pool, ok = c.pools[poolId]; !ok {
-		pool = c.addPool(ctx, poolId)
+	if pool, ok = c.pools[poolId]; ok {
+		return pool, nil
 	}
 
-	return pool
+	return c.addPool(ctx, poolId)
 }
 
-func (c *ServicePoolManager) addPool(ctx context.Context, poolId string) *ServicePool {
-	c.pools[poolId] = c.poolFactory(poolId)
+func (c *ServicePoolManager) addPool(ctx context.Context, poolId string) (*ServicePool, error) {
+	var err error
+
+	if c.pools[poolId], err = c.poolFactory(poolId); err != nil {
+		return nil, fmt.Errorf("could not create pool %q: %w", poolId, err)
+	}
+
 	c.logger.Info(ctx, "created new pool %q", poolId)
 
-	return c.pools[poolId]
+	return c.pools[poolId], nil
 }
 
 func expireObjects[T Objecter](

@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: kubrun-operator
-  namespace: wiremock
+  namespace: kubrun
 rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
@@ -15,11 +15,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: kubrun-operator-binding
-  namespace: wiremock
+  namespace: kubrun
 subjects:
   - kind: ServiceAccount
     name: kubrun
-    namespace: wiremock
+    namespace: kubrun
 roleRef:
   kind: Role
   name: kubrun-operator
