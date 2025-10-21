@@ -10,7 +10,7 @@ RUN go mod download
 COPY . .
 
 # Build static binary for target platform
-RUN go build -o kubrun .
+RUN CGO_ENABLED=0 go build -o kubrun .
 
 # Runtime image
 FROM gcr.io/distroless/static-debian12
