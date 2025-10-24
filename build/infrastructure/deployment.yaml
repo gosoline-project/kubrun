@@ -6,19 +6,27 @@ metadata:
   labels:
     app: kubrun
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: kubrun
   template:
     metadata:
+      annotations:
+        autoscaling.cast.ai/removal-disabled: "true"
       labels:
         app: kubrun
     spec:
       serviceAccountName: kubrun
+      nodeSelector:
+        scheduling.cast.ai/node-template: "gitlab-runner-on-demand"
+      tolerations:
+        - key: "scheduling.cast.ai/node-template"
+          value: "gitlab-runner-on-demand"
+          effect: "NoSchedule"
       containers:
         - name: kubrun
-          image: ghcr.io/gosoline-project/kubrun:main-36d5618
+          image: ghcr.io/gosoline-project/kubrun:main-491b9ae
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8890

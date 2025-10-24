@@ -10,6 +10,8 @@ data:
       namespace: kubrun
     testcontainers:
       default:
+        annotations:
+          "autoscaling\\.cast\\.ai/removal-disabled": "true"
         node_selector:
           "scheduling\\.cast\\.ai/node-template": "gitlab-runner-on-demand"
         tolerations:

@@ -169,9 +169,9 @@ func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1
 	}
 
 	labels := map[string]string{
-		LabelPoolId:        c.id,
-		LabelComponentType: input.ComponentType,
-		LabelContainerName: input.ContainerName,
+		LabelPoolId:        K8sNameString(c.id),
+		LabelComponentType: K8sNameString(input.ComponentType),
+		LabelContainerName: K8sNameString(input.ContainerName),
 		LableIdle:          "true",
 	}
 
@@ -292,7 +292,7 @@ func (c *ServicePool) claimDeployment(ctx context.Context, deployment *appsv1.De
 	expireAfter := c.clock.Now().Add(input.ExpireAfter).Format(time.RFC3339)
 	ops := []string{
 		fmt.Sprintf(`{"op": "remove", "path": "/metadata/labels/%s"}`, strings.ReplaceAll(LableIdle, "/", "~1")),
-		fmt.Sprintf(`{"op": "add", "path": "/metadata/labels/%s", "value": "%s"}`, strings.ReplaceAll(LabelTestId, "/", "~1"), input.TestId),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/labels/%s", "value": "%s"}`, strings.ReplaceAll(LabelTestId, "/", "~1"), K8sNameString(input.TestId)),
 		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationComponentType, "/", "~1"), input.GetComponentType()),
 		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationComponentName, "/", "~1"), input.GetComponentName()),
 		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationContainerName, "/", "~1"), input.GetContainerName()),

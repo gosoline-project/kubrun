@@ -16,6 +16,7 @@ import (
 )
 
 type TestContainerSettings struct {
+	Annotations  map[string]string         `cfg:"annotations"`
 	NodeSelector map[string]string         `cfg:"node_selector"`
 	Tolerations  []TestContainerToleration `cfg:"tolerations"`
 }
@@ -73,6 +74,12 @@ func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *ap
 		})
 	}
 
+	annotations := map[string]string{}
+	for key, value := range f.settings.Annotations {
+		key = strings.ReplaceAll(key, "\\", "")
+		annotations[key] = value
+	}
+
 	nodeSelector := map[string]string{}
 	for key, value := range f.settings.NodeSelector {
 		key = strings.ReplaceAll(key, "\\", "")
@@ -90,7 +97,7 @@ func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *ap
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: K8sNameString("p", input.GetPoolId(), uid, input.GetComponentType(), input.GetContainerName()),
+			Name: K8sNameString("tc", uid, input.GetComponentType(), input.GetContainerName()),
 			Labels: map[string]string{
 				LabelPoolId:        K8sNameString(input.GetPoolId()),
 				LableUid:           uid,
@@ -116,6 +123,7 @@ func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *ap
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
+					Annotations: annotations,
 					Labels: map[string]string{
 						LabelPoolId:        K8sNameString(input.GetPoolId()),
 						LabelComponentType: K8sNameString(input.GetComponentType()),
@@ -150,7 +158,7 @@ func (f *TestContainerFactory) CreateService(uid string, input SpawnAble) *apiv1
 
 	service := &apiv1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: K8sNameString("p", input.GetPoolId(), uid, input.GetComponentType(), input.GetContainerName()),
+			Name: K8sNameString("tc", uid, input.GetComponentType(), input.GetContainerName()),
 			Labels: map[string]string{
 				LabelPoolId:        K8sNameString(input.GetPoolId()),
 				LableUid:           uid,
@@ -179,7 +187,7 @@ func (f *TestContainerFactory) CreateService(uid string, input SpawnAble) *apiv1
 	return service
 }
 
-var nonAlphanumericRegex = regexp.MustCompile(`[^-a-z0-9]+`)
+var nonAlphanumericRegex = regexp.MustCompile(`[^-_\.a-z0-9]+`)
 
 func K8sNameString(strs ...string) string {
 	str := strings.Join(strs, "-")

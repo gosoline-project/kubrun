@@ -16,5 +16,6 @@ k8s:
 
 testcontainers:
   default:
+    annotations: {}
     node_selector: {}
     tolerations: []
