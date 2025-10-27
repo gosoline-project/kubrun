@@ -16,6 +16,8 @@ import (
 	"github.com/justtrackio/gosoline/pkg/uuid"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var specs = map[string]ContainerSpec{
@@ -164,34 +166,44 @@ func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1
 	var deployments []*appsv1.Deployment
 	var service *apiv1.Service
 
-	if _, err = c.spawnDeployment(ctx, input); err != nil {
-		return nil, fmt.Errorf("could not spawn deployment: %w", err)
-	}
-
-	labels := map[string]string{
-		LabelPoolId:        K8sNameString(c.id),
-		LabelComponentType: K8sNameString(input.ComponentType),
-		LabelContainerName: K8sNameString(input.ContainerName),
-		LableIdle:          "true",
-	}
-
-	if deployments, err = c.k8sClient.ListDeployments(ctx, labels); err != nil {
-		return nil, fmt.Errorf("failed to list deployments: %w", err)
-	}
-
-	slices.SortFunc(deployments, func(a, b *appsv1.Deployment) int {
-		if a.CreationTimestamp.Before(&b.CreationTimestamp) {
-			return -1
+	for i := 0; i < 5; i++ {
+		if _, err = c.spawnDeployment(ctx, input); err != nil {
+			return nil, fmt.Errorf("could not spawn deployment: %w", err)
 		}
 
-		return 1
-	})
+		labels := map[string]string{
+			LabelPoolId:        K8sNameString(c.id),
+			LabelComponentType: K8sNameString(input.ComponentType),
+			LabelContainerName: K8sNameString(input.ContainerName),
+			LableIdle:          "true",
+		}
 
-	if service, err = c.claimDeployment(ctx, deployments[0], input); err != nil {
-		return nil, fmt.Errorf("could not claim deployment: %w", err)
+		if deployments, err = c.k8sClient.ListDeployments(ctx, labels); err != nil {
+			return nil, fmt.Errorf("failed to list deployments: %w", err)
+		}
+
+		slices.SortFunc(deployments, func(a, b *appsv1.Deployment) int {
+			if a.CreationTimestamp.Before(&b.CreationTimestamp) {
+				return -1
+			}
+
+			return 1
+		})
+
+		if service, err = c.claimDeployment(ctx, deployments[0], input); err != nil {
+			return nil, fmt.Errorf("could not claim deployment: %w", err)
+		}
+
+		if service != nil {
+			return service, nil
+		}
+
+		if err = c.k8sClient.DeleteDeployment(ctx, deployments[0]); err != nil {
+			return nil, fmt.Errorf("could not delete unclaimable deployment: %w", err)
+		}
 	}
 
-	return service, nil
+	return nil, fmt.Errorf("could not claim a deployment after multiple attempts")
 }
 
 func (c *ServicePool) ExtendServices(ctx context.Context, input *ExtendInput) error {
@@ -304,7 +316,14 @@ func (c *ServicePool) claimDeployment(ctx context.Context, deployment *appsv1.De
 		return nil, fmt.Errorf("could not patch deployment: %w", err)
 	}
 
-	if service, err = c.k8sClient.GetService(ctx, deployment.GetName()); err != nil {
+	service, err = c.k8sClient.GetService(ctx, deployment.GetName())
+	reason := errors.ReasonForError(err)
+
+	if reason == metav1.StatusReasonNotFound {
+		return nil, nil
+	}
+
+	if err != nil {
 		return nil, fmt.Errorf("could not get service: %w", err)
 	}
 
