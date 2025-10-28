@@ -10,6 +10,7 @@ const (
 	AnnotationTestName      = "kubrun/test-name"
 
 	LabelPoolId        = "kubrun/pool-id"
+	LabelRunnerId      = "kubrun/runner-id"
 	LabelTestId        = "kubrun/test-id"
 	LabelComponentType = "kubrun/component-type"
 	LabelComponentName = "kubrun/component-name"
@@ -30,6 +31,7 @@ type Objecter interface {
 
 type SpawnAble interface {
 	GetPoolId() string
+	GetRunnerId() string
 	GetComponentType() string
 	GetContainerName() string
 	GetSpec() ContainerSpec
@@ -37,6 +39,7 @@ type SpawnAble interface {
 
 type WarmUpDeployment struct {
 	PoolId        string        `json:"pool_id"`
+	RunnerId      string        `json:"runner_id"`
 	ComponentType string        `json:"component_type"`
 	ContainerName string        `json:"container_name"`
 	Spec          ContainerSpec `json:"spec"`
@@ -44,6 +47,10 @@ type WarmUpDeployment struct {
 
 func (i WarmUpDeployment) GetPoolId() string {
 	return i.PoolId
+}
+
+func (i WarmUpDeployment) GetRunnerId() string {
+	return i.RunnerId
 }
 
 func (i WarmUpDeployment) GetComponentType() string {

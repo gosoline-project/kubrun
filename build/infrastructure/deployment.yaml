@@ -26,7 +26,7 @@ spec:
           effect: "NoSchedule"
       containers:
         - name: kubrun
-          image: ghcr.io/gosoline-project/kubrun:main-f193605
+          image: ghcr.io/gosoline-project/kubrun:main-bb95a11
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8890

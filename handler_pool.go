@@ -37,7 +37,7 @@ func NewHandlerPool(ctx context.Context, config cfg.Config, logger log.Logger) (
 }
 
 func (h *HandlerPool) HandleWarmUp(ctx context.Context, input *WarmUpInput) (httpserver.Response, error) {
-	if err := h.poolManager.WarmUpPool(ctx, input); err != nil {
+	if err := h.poolManager.CreatePool(ctx, input); err != nil {
 		return nil, fmt.Errorf("could not warm up pool: %w", err)
 	}
 

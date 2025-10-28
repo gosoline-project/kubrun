@@ -8,9 +8,15 @@ import (
 
 	"github.com/justtrackio/gosoline/pkg/appctx"
 	"github.com/justtrackio/gosoline/pkg/cfg"
+	"github.com/justtrackio/gosoline/pkg/encoding/json"
 	"github.com/justtrackio/gosoline/pkg/funk"
 	"github.com/justtrackio/gosoline/pkg/log"
+	"github.com/justtrackio/gosoline/pkg/uuid"
 	apiv1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/util/retry"
 )
 
 type servicePoolManagerKey struct{}
@@ -20,12 +26,13 @@ func ProvideServicePoolManager(ctx context.Context, config cfg.Config, logger lo
 		var err error
 		var k8sClient *K8sClient
 
-		if k8sClient, err = NewK8sClient(config, logger); err != nil {
+		if k8sClient, err = ProvideK8sClient(config, logger); err != nil {
 			return nil, fmt.Errorf("could not create k8s client: %w", err)
 		}
 
-		poolFactory := func(id string) (*ServicePool, error) {
-			return NewServicePool(config, logger, k8sClient, id)
+		runnerId := uuid.New().NewV4()
+		poolFactory := func(poolId string) (*ServicePool, error) {
+			return NewServicePool(config, logger, k8sClient, poolId, runnerId)
 		}
 
 		return &ServicePoolManager{
@@ -45,26 +52,129 @@ type ServicePoolManager struct {
 	pools       map[string]*ServicePool
 }
 
-func (c *ServicePoolManager) WarmUpPool(ctx context.Context, input *WarmUpInput) error {
+func (c *ServicePoolManager) CreatePool(ctx context.Context, input *WarmUpInput) error {
 	var err error
-	var pool *ServicePool
+	var configMap *apiv1.ConfigMap
+	var data []byte
 
-	if pool, err = c.getPool(ctx, input.PoolId); err != nil {
-		return fmt.Errorf("could not get pool: %w", err)
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if configMap, err = c.k8sClient.configMaps.Get(ctx, "pool-configuration", metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("could not get configmap: %w", err)
+		}
+
+		if data, err = json.Marshal(input.Components); err != nil {
+			return fmt.Errorf("could not marshal components: %w", err)
+		}
+
+		if configMap.Data == nil {
+			configMap.Data = map[string]string{}
+		}
+
+		configMap.Data[input.PoolId] = string(data)
+		_, err = c.k8sClient.configMaps.Update(ctx, configMap, metav1.UpdateOptions{})
+
+		return err
+	})
+}
+
+func (c *ServicePoolManager) WatchPools(ctx context.Context) error {
+	var err error
+	var watcher watch.Interface
+	var configMap *apiv1.ConfigMap
+
+	opts := metav1.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", "pool-configuration").String(),
 	}
 
-	return pool.WarmUp(ctx, input)
+	if watcher, err = c.k8sClient.configMaps.Watch(ctx, opts); err != nil {
+		return fmt.Errorf("could not watch pools: %w", err)
+	}
+
+	defer watcher.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				return nil
+			}
+
+			if configMap, ok = event.Object.(*apiv1.ConfigMap); !ok {
+				return fmt.Errorf("could not cast watched object to config map")
+			}
+
+			if err = c.syncPools(ctx, configMap.Data); err != nil {
+				return fmt.Errorf("could not sync pools: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *ServicePoolManager) syncPools(ctx context.Context, pools map[string]string) error {
+	var err error
+	var components map[string]int
+	var pool *ServicePool
+
+	for poolId, componentsJson := range pools {
+		if ok := c.hasPool(poolId); ok {
+			continue
+		}
+
+		if err = json.Unmarshal([]byte(componentsJson), &components); err != nil {
+			return fmt.Errorf("could not unmarshal components for pool %q: %w", poolId, err)
+		}
+
+		if pool, err = c.getPool(ctx, poolId); err != nil {
+			return fmt.Errorf("could not get pool: %w", err)
+		}
+
+		warmUpInput := &WarmUpInput{
+			PoolId:     poolId,
+			Components: components,
+		}
+
+		if err = pool.WarmUp(ctx, warmUpInput); err != nil {
+			return fmt.Errorf("could not warm up pool %q: %w", poolId, err)
+		}
+	}
+
+	availablePools := funk.Keys(c.pools)
+	for _, poolId := range availablePools {
+		if _, ok := pools[poolId]; ok {
+			continue
+		}
+
+		if err = c.deletePool(ctx, poolId); err != nil {
+			return fmt.Errorf("could not shutdown pool %q: %w", poolId, err)
+		}
+	}
+
+	return nil
 }
 
 func (c *ServicePoolManager) ShutdownPool(ctx context.Context, input *ShutdownInput) error {
 	var err error
-	var pool *ServicePool
+	var configMap *apiv1.ConfigMap
 
-	if pool, err = c.getPool(ctx, input.PoolId); err != nil {
-		return fmt.Errorf("could not get pool: %w", err)
-	}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if configMap, err = c.k8sClient.configMaps.Get(ctx, "pool-configuration", metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("could not get configmap: %w", err)
+		}
 
-	return pool.Shutdown(ctx)
+		if configMap.Data == nil {
+			return nil
+		}
+
+		delete(configMap.Data, input.PoolId)
+
+		_, err = c.k8sClient.configMaps.Update(ctx, configMap, metav1.UpdateOptions{})
+
+		return err
+	})
 }
 
 func (c *ServicePoolManager) FetchService(ctx context.Context, input *RunInput) (*apiv1.Service, error) {
@@ -136,6 +246,15 @@ func (c *ServicePoolManager) ExpireServices(ctx context.Context) error {
 	return nil
 }
 
+func (c *ServicePoolManager) hasPool(poolId string) bool {
+	c.lck.Lock()
+	defer c.lck.Unlock()
+
+	_, ok := c.pools[poolId]
+
+	return ok
+}
+
 func (c *ServicePoolManager) getPool(ctx context.Context, poolId string) (*ServicePool, error) {
 	c.lck.Lock()
 	defer c.lck.Unlock()
@@ -160,6 +279,21 @@ func (c *ServicePoolManager) addPool(ctx context.Context, poolId string) (*Servi
 	c.logger.Info(ctx, "created new pool %q", poolId)
 
 	return c.pools[poolId], nil
+}
+
+func (c *ServicePoolManager) deletePool(ctx context.Context, poolId string) error {
+	c.lck.Lock()
+	defer c.lck.Unlock()
+
+	if pool, ok := c.pools[poolId]; ok {
+		if err := pool.Shutdown(ctx); err != nil {
+			return fmt.Errorf("could not shutdown pool %q: %w", poolId, err)
+		}
+
+		delete(c.pools, poolId)
+	}
+
+	return nil
 }
 
 func expireObjects[T Objecter](

@@ -22,7 +22,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func NewK8sClient(config cfg.Config, logger log.Logger) (*K8sClient, error) {
+func ProvideK8sClient(config cfg.Config, logger log.Logger) (*K8sClient, error) {
 	var err error
 	var settings *KubeSettings
 	var clientConfig *rest.Config
@@ -71,6 +71,7 @@ func newK8sClient(config cfg.Config, logger log.Logger, clientConfig *rest.Confi
 		client:      client,
 		deployments: client.AppsV1().Deployments(settings.Namespace),
 		services:    client.CoreV1().Services(settings.Namespace),
+		configMaps: client.CoreV1().ConfigMaps(settings.Namespace),
 	}, nil
 }
 
@@ -80,6 +81,7 @@ type K8sClient struct {
 
 	deployments clientApps.DeploymentInterface
 	services    clientCore.ServiceInterface
+	configMaps  clientCore.ConfigMapInterface
 }
 
 func (c K8sClient) ListDeployments(ctx context.Context, selectors ...map[string]string) ([]*appsv1.Deployment, error) {

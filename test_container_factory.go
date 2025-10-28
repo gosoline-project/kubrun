@@ -100,6 +100,7 @@ func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *ap
 			Name: K8sNameString("tc", uid, input.GetComponentType(), input.GetContainerName()),
 			Labels: map[string]string{
 				LabelPoolId:        K8sNameString(input.GetPoolId()),
+				LabelRunnerId:      K8sNameString(input.GetRunnerId()),
 				LableUid:           uid,
 				LabelComponentType: K8sNameString(input.GetComponentType()),
 				LabelContainerName: K8sNameString(input.GetContainerName()),
@@ -116,6 +117,7 @@ func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *ap
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					LabelPoolId:        K8sNameString(input.GetPoolId()),
+					LabelRunnerId:      K8sNameString(input.GetRunnerId()),
 					LabelComponentType: K8sNameString(input.GetComponentType()),
 					LabelContainerName: K8sNameString(input.GetContainerName()),
 					LableUid:           uid,
@@ -126,6 +128,7 @@ func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *ap
 					Annotations: annotations,
 					Labels: map[string]string{
 						LabelPoolId:        K8sNameString(input.GetPoolId()),
+						LabelRunnerId:      K8sNameString(input.GetRunnerId()),
 						LabelComponentType: K8sNameString(input.GetComponentType()),
 						LabelContainerName: K8sNameString(input.GetContainerName()),
 						LableUid:           uid,
@@ -161,6 +164,7 @@ func (f *TestContainerFactory) CreateService(uid string, input SpawnAble) *apiv1
 			Name: K8sNameString("tc", uid, input.GetComponentType(), input.GetContainerName()),
 			Labels: map[string]string{
 				LabelPoolId:        K8sNameString(input.GetPoolId()),
+				LabelRunnerId:      K8sNameString(input.GetRunnerId()),
 				LableUid:           uid,
 				LabelComponentType: K8sNameString(input.GetComponentType()),
 				LabelContainerName: K8sNameString(input.GetContainerName()),
@@ -175,6 +179,7 @@ func (f *TestContainerFactory) CreateService(uid string, input SpawnAble) *apiv1
 		Spec: apiv1.ServiceSpec{
 			Selector: map[string]string{
 				LabelPoolId:        K8sNameString(input.GetPoolId()),
+				LabelRunnerId:      K8sNameString(input.GetRunnerId()),
 				LabelComponentType: K8sNameString(input.GetComponentType()),
 				LabelContainerName: K8sNameString(input.GetContainerName()),
 				LableUid:           uid,

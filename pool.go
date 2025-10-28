@@ -105,11 +105,12 @@ type ServicePool struct {
 	logger    log.Logger
 	k8sClient *K8sClient
 	factory   *TestContainerFactory
-	id        string
 	clock     clock.Clock
+	poolId    string
+	runnerId  string
 }
 
-func NewServicePool(config cfg.Config, logger log.Logger, k8sClient *K8sClient, id string) (*ServicePool, error) {
+func NewServicePool(config cfg.Config, logger log.Logger, k8sClient *K8sClient, poolId string, runnerId string) (*ServicePool, error) {
 	var err error
 	var factory *TestContainerFactory
 
@@ -118,11 +119,12 @@ func NewServicePool(config cfg.Config, logger log.Logger, k8sClient *K8sClient, 
 	}
 
 	return &ServicePool{
-		logger:    logger.WithChannel("pool").WithFields(log.Fields{"pool-id": id}),
+		logger:    logger.WithChannel("pool").WithFields(log.Fields{"pool-id": poolId}),
 		k8sClient: k8sClient,
 		factory:   factory,
-		id:        id,
 		clock:     clock.NewRealClock(),
+		poolId:    poolId,
+		runnerId:  runnerId,
 	}, nil
 }
 
@@ -138,7 +140,8 @@ func (c *ServicePool) WarmUp(ctx context.Context, input *WarmUpInput) error {
 		}
 
 		warmUp := &WarmUpDeployment{
-			PoolId:        input.PoolId,
+			PoolId:        c.poolId,
+			RunnerId:      c.runnerId,
 			ComponentType: componentType,
 			ContainerName: "main",
 			Spec:          spec,
@@ -155,7 +158,7 @@ func (c *ServicePool) WarmUp(ctx context.Context, input *WarmUpInput) error {
 }
 
 func (c *ServicePool) Shutdown(ctx context.Context) error {
-	return c.ReleaseServices(ctx, map[string]string{LabelPoolId: c.id})
+	return c.ReleaseServices(ctx, map[string]string{LabelPoolId: c.poolId, LabelRunnerId: c.runnerId})
 }
 
 func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1.Service, error) {
@@ -167,12 +170,21 @@ func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1
 	var service *apiv1.Service
 
 	for i := 0; i < 5; i++ {
-		if _, err = c.spawnDeployment(ctx, input); err != nil {
+		warmUp := &WarmUpDeployment{
+			PoolId:        c.poolId,
+			RunnerId:      c.runnerId,
+			ComponentType: input.ComponentType,
+			ContainerName: input.ContainerName,
+			Spec:          input.Spec,
+		}
+
+		if _, err = c.spawnDeployment(ctx, warmUp); err != nil {
 			return nil, fmt.Errorf("could not spawn deployment: %w", err)
 		}
 
 		labels := map[string]string{
-			LabelPoolId:        K8sNameString(c.id),
+			LabelPoolId:        K8sNameString(c.poolId),
+			LabelRunnerId:      K8sNameString(c.runnerId),
 			LabelComponentType: K8sNameString(input.ComponentType),
 			LabelContainerName: K8sNameString(input.ContainerName),
 			LableIdle:          "true",
@@ -204,6 +216,45 @@ func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1
 	}
 
 	return nil, fmt.Errorf("could not claim a deployment after multiple attempts")
+}
+
+func (c *ServicePool) claimDeployment(ctx context.Context, deployment *appsv1.Deployment, input *RunInput) (*apiv1.Service, error) {
+	var err error
+	var service *apiv1.Service
+
+	expireAfter := c.clock.Now().Add(input.ExpireAfter).Format(time.RFC3339)
+	ops := []string{
+		fmt.Sprintf(`{"op": "remove", "path": "/metadata/labels/%s"}`, strings.ReplaceAll(LableIdle, "/", "~1")),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/labels/%s", "value": "%s"}`, strings.ReplaceAll(LabelTestId, "/", "~1"), K8sNameString(input.TestId)),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationComponentType, "/", "~1"), input.GetComponentType()),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationComponentName, "/", "~1"), input.GetComponentName()),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationContainerName, "/", "~1"), input.GetContainerName()),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationExpireAfter, "/", "~1"), expireAfter),
+		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationTestName, "/", "~1"), input.TestName),
+	}
+
+	if deployment, err = c.k8sClient.PatchDeployment(ctx, deployment, ops); err != nil {
+		return nil, fmt.Errorf("could not patch deployment: %w", err)
+	}
+
+	service, err = c.k8sClient.GetService(ctx, deployment.GetName())
+	reason := errors.ReasonForError(err)
+
+	if reason == metav1.StatusReasonNotFound {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("could not get service: %w", err)
+	}
+
+	if service, err = c.k8sClient.PatchService(ctx, service, ops); err != nil {
+		return nil, fmt.Errorf("could not patch service: %w", err)
+	}
+
+	c.logger.Info(ctx, "claimed deployment %q", deployment.Name)
+
+	return service, nil
 }
 
 func (c *ServicePool) ExtendServices(ctx context.Context, input *ExtendInput) error {
@@ -295,43 +346,4 @@ func (c *ServicePool) spawnDeployment(ctx context.Context, input SpawnAble) (*ap
 	c.logger.Info(ctx, "spawned deployment %q", deployment.Name)
 
 	return deployment, nil
-}
-
-func (c *ServicePool) claimDeployment(ctx context.Context, deployment *appsv1.Deployment, input *RunInput) (*apiv1.Service, error) {
-	var err error
-	var service *apiv1.Service
-
-	expireAfter := c.clock.Now().Add(input.ExpireAfter).Format(time.RFC3339)
-	ops := []string{
-		fmt.Sprintf(`{"op": "remove", "path": "/metadata/labels/%s"}`, strings.ReplaceAll(LableIdle, "/", "~1")),
-		fmt.Sprintf(`{"op": "add", "path": "/metadata/labels/%s", "value": "%s"}`, strings.ReplaceAll(LabelTestId, "/", "~1"), K8sNameString(input.TestId)),
-		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationComponentType, "/", "~1"), input.GetComponentType()),
-		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationComponentName, "/", "~1"), input.GetComponentName()),
-		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationContainerName, "/", "~1"), input.GetContainerName()),
-		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationExpireAfter, "/", "~1"), expireAfter),
-		fmt.Sprintf(`{"op": "add", "path": "/metadata/annotations/%s", "value": "%s"}`, strings.ReplaceAll(AnnotationTestName, "/", "~1"), input.TestName),
-	}
-
-	if deployment, err = c.k8sClient.PatchDeployment(ctx, deployment, ops); err != nil {
-		return nil, fmt.Errorf("could not patch deployment: %w", err)
-	}
-
-	service, err = c.k8sClient.GetService(ctx, deployment.GetName())
-	reason := errors.ReasonForError(err)
-
-	if reason == metav1.StatusReasonNotFound {
-		return nil, nil
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("could not get service: %w", err)
-	}
-
-	if service, err = c.k8sClient.PatchService(ctx, service, ops); err != nil {
-		return nil, fmt.Errorf("could not patch service: %w", err)
-	}
-
-	c.logger.Info(ctx, "claimed deployment %q", deployment.Name)
-
-	return service, nil
 }
