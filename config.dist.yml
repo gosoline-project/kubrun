@@ -52,6 +52,8 @@ containerspecs:
       main:
         container_port: 3306
         protocol: tcp
+    tmpfs:
+      data: "/var/lib/mysql"
   redis:
     repository: redis
     tag: 7-alpine

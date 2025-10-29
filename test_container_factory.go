@@ -57,6 +57,7 @@ func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *ap
 				apiv1.ResourceMemory: resource.MustParse("300Mi"),
 			},
 		},
+		VolumeMounts: []apiv1.VolumeMount{},
 	}
 
 	for k, v := range spec.Env {
@@ -71,6 +72,13 @@ func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *ap
 			Name:          K8sNameString(portName),
 			Protocol:      apiv1.Protocol(strings.ToUpper(portConfig.Protocol)),
 			ContainerPort: int32(portConfig.ContainerPort),
+		})
+	}
+
+	for name, path := range spec.Tmpfs {
+		container.VolumeMounts = append(container.VolumeMounts, apiv1.VolumeMount{
+			Name:      K8sNameString("tmpfs", name),
+			MountPath: path,
 		})
 	}
 
@@ -92,6 +100,18 @@ func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *ap
 			Key:    t.Key,
 			Value:  t.Value,
 			Effect: apiv1.TaintEffect(t.Effect),
+		})
+	}
+
+	volumes := make([]apiv1.Volume, 0)
+	for name := range spec.Tmpfs {
+		volumes = append(volumes, apiv1.Volume{
+			Name: K8sNameString("tmpfs", name),
+			VolumeSource: apiv1.VolumeSource{
+				EmptyDir: &apiv1.EmptyDirVolumeSource{
+					Medium: "Memory",
+				},
+			},
 		})
 	}
 
@@ -138,6 +158,7 @@ func (f *TestContainerFactory) CreateDeployment(uid string, input SpawnAble) *ap
 					Containers:   []apiv1.Container{container},
 					NodeSelector: nodeSelector,
 					Tolerations:  tolerations,
+					Volumes:      volumes,
 				},
 			},
 		},

@@ -94,9 +94,15 @@ func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1
 	c.lck.Lock()
 	defer c.lck.Unlock()
 
+	var ok bool
 	var err error
+	var spec ContainerSpec
 	var deployments []*appsv1.Deployment
 	var service *apiv1.Service
+
+	if spec, ok = c.specs[input.ComponentType]; !ok {
+		return nil, fmt.Errorf("no spec found for component type %q", input.ComponentType)
+	}
 
 	for i := 0; i < 5; i++ {
 		warmUp := &WarmUpDeployment{
@@ -104,7 +110,7 @@ func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1
 			RunnerId:      c.runnerId,
 			ComponentType: input.ComponentType,
 			ContainerName: input.ContainerName,
-			Spec:          input.Spec,
+			Spec:          spec,
 		}
 
 		if _, err = c.spawnDeployment(ctx, warmUp); err != nil {

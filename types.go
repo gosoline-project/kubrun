@@ -72,7 +72,6 @@ type RunInput struct {
 	ComponentType string        `json:"component_type"`
 	ComponentName string        `json:"component_name"`
 	ContainerName string        `json:"container_name"`
-	Spec          ContainerSpec `json:"spec"`
 	ExpireAfter   time.Duration `json:"expire_after"`
 }
 
@@ -103,10 +102,6 @@ func (i RunInput) GetLabels() map[string]string {
 		LabelComponentType: K8sNameString(i.ComponentType),
 		LabelComponentName: K8sNameString(i.ComponentName),
 	}
-}
-
-func (i RunInput) GetSpec() ContainerSpec {
-	return i.Spec
 }
 
 func (i RunInput) GetExpireAfter() time.Duration {
@@ -144,6 +139,7 @@ type ContainerSpec struct {
 	Env          map[string]string      `json:"env" cfg:"env"`
 	Cmd          []string               `json:"cmd" cfg:"cmd"`
 	PortBindings map[string]PortBinding `json:"port_bindings" cfg:"port_bindings"`
+	Tmpfs        map[string]string      `json:"tmpfs" cfg:"tmpfs"`
 }
 
 type PortBinding struct {
