@@ -1,0 +1,5 @@
+kubrun:
+  nodeSelector: {}
+  tolerations: []
+
+testcontainers: ""

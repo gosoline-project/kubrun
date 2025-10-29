@@ -139,17 +139,17 @@ func (i StopInput) GetLabels() map[string]string {
 }
 
 type ContainerSpec struct {
-	Repository   string                 `json:"repository"`
-	Tag          string                 `json:"tag"`
-	Env          map[string]string      `json:"env"`
-	Cmd          []string               `json:"cmd"`
-	PortBindings map[string]PortBinding `json:"port_bindings"`
+	Repository   string                 `json:"repository" cfg:"repository"`
+	Tag          string                 `json:"tag" cfg:"tag"`
+	Env          map[string]string      `json:"env" cfg:"env"`
+	Cmd          []string               `json:"cmd" cfg:"cmd"`
+	PortBindings map[string]PortBinding `json:"port_bindings" cfg:"port_bindings"`
 }
 
 type PortBinding struct {
-	ContainerPort int    `json:"container_port"`
-	HostPort      int    `json:"host_port"`
-	Protocol      string `json:"protocol"`
+	ContainerPort int    `json:"container_port" cfg:"container_port"`
+	HostPort      int    `json:"host_port" cfg:"host_port"`
+	Protocol      string `json:"protocol" cfg:"protocol" default:"tcp"`
 }
 
 type AnnotationsAware interface {

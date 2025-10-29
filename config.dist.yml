@@ -19,3 +19,63 @@ testcontainers:
     annotations: {}
     node_selector: {}
     tolerations: []
+
+containerspecs:
+  ddb:
+    repository: amazon/dynamodb-local
+    tag: 2.5.4
+    port_bindings:
+      main:
+        container_port: 8000
+        protocol: tcp
+  localstack:
+    repository: localstack/localstack
+    tag: 4.1.0
+    port_bindings:
+      main:
+        container_port: 4566
+        protocol: tcp
+  mysql:
+    repository: mysql/mysql-server
+    tag: "8.0"
+    env:
+      MYSQL_DATABASE: "gosoline"
+      MYSQL_USER: "gosoline"
+      MYSQL_PASSWORD: "gosoline"
+      MYSQL_ROOT_PASSWORD: "gosoline"
+      MYSQL_ROOT_HOST: "%"
+    cmd:
+      - "--sql_mode=NO_ENGINE_SUBSTITUTION"
+      - "--log-bin-trust-function-creators=TRUE"
+      - "--max_connections=1000"
+    port_bindings:
+      main:
+        container_port: 3306
+        protocol: tcp
+  redis:
+    repository: redis
+    tag: 7-alpine
+    port_bindings:
+      main:
+        container_port: 6379
+        protocol: tcp
+  s3:
+    repository: minio/minio
+    tag: RELEASE.2024-02-17T01-15-57Z
+    cmd:
+      - "server"
+      - "/data"
+    env:
+      MINIO_ACCESS_KEY: gosoline
+      MINIO_SECRET_KEY: gosoline
+    port_bindings:
+      main:
+        container_port: 6379
+        protocol: tcp
+  wiremock:
+    repository: wiremock/wiremock
+    tag: 3.4.1
+    port_bindings:
+      main:
+        container_port: 8080
+        protocol: tcp

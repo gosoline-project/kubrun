@@ -20,91 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var specs = map[string]ContainerSpec{
-	"ddb": {
-		Repository: "amazon/dynamodb-local",
-		Tag:        "2.5.4",
-		PortBindings: map[string]PortBinding{
-			"main": {
-				ContainerPort: 8000,
-				Protocol:      "tcp",
-			},
-		},
-	},
-	"localstack": {
-		Repository: "localstack/localstack",
-		Tag:        "4.1.0",
-		PortBindings: map[string]PortBinding{
-			"main": {
-				ContainerPort: 4566,
-				Protocol:      "tcp",
-			},
-		},
-	},
-	"mysql": {
-		Repository: "mysql/mysql-server",
-		Tag:        "8.0",
-		Env: map[string]string{
-			"MYSQL_DATABASE":      "gosoline",
-			"MYSQL_USER":          "gosoline",
-			"MYSQL_PASSWORD":      "gosoline",
-			"MYSQL_ROOT_PASSWORD": "gosoline",
-			"MYSQL_ROOT_HOST":     "%",
-		},
-		Cmd: []string{"--sql_mode=NO_ENGINE_SUBSTITUTION", "--log-bin-trust-function-creators=TRUE", "--max_connections=1000"},
-		PortBindings: map[string]PortBinding{
-			"main": {
-				ContainerPort: 3306,
-				Protocol:      "tcp",
-			},
-		},
-	},
-	"redis": {
-		Repository: "redis",
-		Tag:        "7-alpine",
-		PortBindings: map[string]PortBinding{
-			"main": {
-				ContainerPort: 6379,
-				Protocol:      "tcp",
-			},
-		},
-	},
-	"s3": {
-		Repository: "minio/minio",
-		Tag:        "RELEASE.2024-02-17T01-15-57Z",
-		Cmd: []string{
-			"server",
-			"/data",
-		},
-		Env: map[string]string{
-			"MINIO_ACCESS_KEY": "gosoline",
-			"MINIO_SECRET_KEY": "gosoline",
-		},
-		PortBindings: map[string]PortBinding{
-			"main": {
-				ContainerPort: 6379,
-				Protocol:      "tcp",
-			},
-		},
-	},
-	"wiremock": {
-		Repository: "wiremock/wiremock",
-		Tag:        "3.4.1",
-		Cmd:        []string{"--local-response-templating"},
-		PortBindings: map[string]PortBinding{
-			"main": {
-				ContainerPort: 8080,
-				Protocol:      "tcp",
-			},
-		},
-	},
-}
+type ContainerSpecSettings map[string]ContainerSpec
 
 type ServicePool struct {
 	lck       sync.RWMutex
 	logger    log.Logger
 	k8sClient *K8sClient
 	factory   *TestContainerFactory
+	specs     ContainerSpecSettings
 	clock     clock.Clock
 	poolId    string
 	runnerId  string
@@ -118,10 +41,16 @@ func NewServicePool(config cfg.Config, logger log.Logger, k8sClient *K8sClient, 
 		return nil, fmt.Errorf("could not create test container factory: %w", err)
 	}
 
+	specs := ContainerSpecSettings{}
+	if err = config.UnmarshalKey("containerspecs", &specs); err != nil {
+		return nil, fmt.Errorf("could not unmarshal pool specs: %w", err)
+	}
+
 	return &ServicePool{
 		logger:    logger.WithChannel("pool").WithFields(log.Fields{"pool-id": poolId}),
 		k8sClient: k8sClient,
 		factory:   factory,
+		specs:     specs,
 		clock:     clock.NewRealClock(),
 		poolId:    poolId,
 		runnerId:  runnerId,
@@ -133,7 +62,7 @@ func (c *ServicePool) WarmUp(ctx context.Context, input *WarmUpInput) error {
 	var spec ContainerSpec
 
 	for componentType, count := range input.Components {
-		if spec, ok = specs[componentType]; !ok {
+		if spec, ok = c.specs[componentType]; !ok {
 			c.logger.Info(ctx, "no warm up spec found for component type %q: skipping", componentType)
 
 			continue
@@ -158,7 +87,7 @@ func (c *ServicePool) WarmUp(ctx context.Context, input *WarmUpInput) error {
 }
 
 func (c *ServicePool) Shutdown(ctx context.Context) error {
-	return c.ReleaseServices(ctx, map[string]string{LabelPoolId: c.poolId, LabelRunnerId: c.runnerId})
+	return c.ReleaseServices(ctx, map[string]string{LabelPoolId: c.poolId})
 }
 
 func (c *ServicePool) ClaimService(ctx context.Context, input *RunInput) (*apiv1.Service, error) {

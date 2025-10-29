@@ -285,13 +285,21 @@ func (c *ServicePoolManager) deletePool(ctx context.Context, poolId string) erro
 	c.lck.Lock()
 	defer c.lck.Unlock()
 
-	if pool, ok := c.pools[poolId]; ok {
-		if err := pool.Shutdown(ctx); err != nil {
-			return fmt.Errorf("could not shutdown pool %q: %w", poolId, err)
-		}
+	var ok bool
+	var err error
+	var pool *ServicePool
 
-		delete(c.pools, poolId)
+	if pool, ok = c.pools[poolId]; !ok {
+		if pool, err = c.addPool(ctx, poolId); err != nil {
+			return fmt.Errorf("could not create pool %q: %w", poolId, err)
+		}
 	}
+
+	if err = pool.Shutdown(ctx); err != nil {
+		return fmt.Errorf("could not shutdown pool %q: %w", poolId, err)
+	}
+
+	delete(c.pools, poolId)
 
 	return nil
 }

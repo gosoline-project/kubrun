@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubrun-config
+  namespace: kubrun
+data:
+  config.yml: |
+    k8s:
+      client_mode: in-cluster
+      namespace: kubrun
+    testcontainers:
+{{ .Values.testcontainers | indent 6 }}
