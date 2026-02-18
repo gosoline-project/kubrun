@@ -160,7 +160,7 @@ func (c *ServicePoolManager) ShutdownPool(ctx context.Context, input *ShutdownIn
 	var err error
 	var configMap *apiv1.ConfigMap
 
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if configMap, err = c.k8sClient.configMaps.Get(ctx, "pool-configuration", metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not get configmap: %w", err)
 		}
@@ -175,6 +175,15 @@ func (c *ServicePoolManager) ShutdownPool(ctx context.Context, input *ShutdownIn
 
 		return err
 	})
+	if err != nil {
+		return fmt.Errorf("could not update configmap: %w", err)
+	}
+
+	if err = c.deletePool(ctx, input.PoolId); err != nil {
+		return fmt.Errorf("could not shutdown pool %q: %w", input.PoolId, err)
+	}
+
+	return nil
 }
 
 func (c *ServicePoolManager) FetchService(ctx context.Context, input *RunInput) (*apiv1.Service, error) {

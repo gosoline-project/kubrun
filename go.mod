@@ -1,6 +1,6 @@
 module github.com/gosoline-project/kubrun
 
-go 1.25.0
+go 1.25.7
 
 require (
 	github.com/gosoline-project/httpserver v0.0.0-20251017133632-e494054f0bb7

@@ -22,7 +22,7 @@ spec:
       tolerations: {{ .Values.kubrun.tolerations | toYaml | nindent 8 }}
       containers:
         - name: kubrun
-          image: ghcr.io/gosoline-project/kubrun:main-66c7914
+          image: ghcr.io/gosoline-project/kubrun:main-684a84e
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8890

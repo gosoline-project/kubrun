@@ -10,3 +10,14 @@ data:
       namespace: kubrun
     testcontainers:
 {{ .Values.testcontainers | indent 6 }}
+    containerspecs:
+      mailpit:
+        repository: axllent/mailpit
+        tag: v1.23.2
+        port_bindings:
+          main:
+            container_port: 1025
+            protocol: tcp
+          web:
+            container_port: 8025
+            protocol: tcp
