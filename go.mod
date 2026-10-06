@@ -3,7 +3,7 @@ module github.com/gosoline-project/kubrun
 go 1.25.7
 
 require (
-	github.com/gosoline-project/httpserver v0.6.5-0.20261006060425-fbfb6b4f4b72
+	github.com/gosoline-project/httpserver v0.6.5-0.20261006061447-5db6ff094b1a
 	github.com/justtrackio/gosoline v0.66.2-0.20261005101741-c0a846fd1d7c
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
@@ -20,7 +20,6 @@ require (
 	github.com/Shopify/toxiproxy/v2 v2.9.0 // indirect
 	github.com/VividCortex/mysqlerr v0.0.0-20170204212430-6c6b55f8796f // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
-	github.com/aws/aws-sdk-go v1.49.6 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.5 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.8 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.27.33 // indirect
@@ -48,7 +47,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.22.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.26.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.30.7 // indirect
-	github.com/aws/aws-xray-sdk-go v1.7.0 // indirect
 	github.com/aws/aws-xray-sdk-go/v2 v2.0.0 // indirect
 	github.com/aws/smithy-go v1.24.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -68,7 +66,6 @@ require (
 	github.com/docker/docker v28.0.0+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/elastic/go-elasticsearch/v7 v7.2.1-0.20190714143206-f1e755531ff4 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/ettle/strcase v0.2.0 // indirect
 	github.com/evanphx/json-patch v0.5.2 // indirect
@@ -99,7 +96,6 @@ require (
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-migrate/migrate/v4 v4.18.1 // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
@@ -168,7 +164,6 @@ require (
 	github.com/segmentio/go-snakecase v1.2.0 // indirect
 	github.com/selm0/ladon v0.0.0-20231114080549-31144de4b38d // indirect
 	github.com/sethvargo/go-retry v0.2.4 // indirect
-	github.com/sha1sum/aws_signing_client v0.0.0-20170514202702-9088e4c7b34b // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
