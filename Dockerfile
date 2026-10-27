@@ -1,5 +1,5 @@
-# Multi-stage build
-FROM golang:1.25 AS builder
+# Multi-stage build; keep the security-patched Go version aligned with go.mod.
+FROM golang:1.26.10 AS builder
 WORKDIR /src
 
 # Cache dependencies
