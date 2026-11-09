@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	github.com/gosoline-project/httpserver v0.6.5-0.20261026100922-13fdf9916b14
-	github.com/justtrackio/gosoline v0.68.4-0.20261026102448-e669b1bf2ab6
+	github.com/justtrackio/gosoline v0.69.0
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
