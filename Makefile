@@ -1,8 +1,8 @@
 # Simple Docker build & push helpers (GitHub Container Registry)
 #
-# Development requires Go 1.26.10 or newer (Go 1.25 is no longer supported).
-# Check dependencies with: GOTOOLCHAIN=go1.26.10 govulncheck ./...
-# Some legacy Gosoline transitive dependencies still have no compatible fix;
+# Development requires Go 1.26.11 or newer (Go 1.25 is no longer supported).
+# Check dependencies with: GOTOOLCHAIN=go1.26.11 govulncheck ./...
+# The dependency graph includes the unmaintained OpenPGP module advisory;
 # a successful image build is not evidence of a clean vulnerability scan.
 
 # Set GH_OWNER to your GitHub username or org (without ghcr.io/)
