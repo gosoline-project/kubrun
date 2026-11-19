@@ -4,7 +4,7 @@ go 1.26.11
 
 require (
 	github.com/gosoline-project/httpserver v0.6.5
-	github.com/justtrackio/gosoline v0.69.4-0.20261119145002-5d9b5abd62e7
+	github.com/justtrackio/gosoline v0.69.4-0.20261119192118-ea1ab1cd583b
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
@@ -120,7 +120,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
-	github.com/iskorotkov/avro/v2 v2.33.0 // indirect
+	github.com/iskorotkov/avro/v2 v2.33.1 // indirect
 	github.com/jeremywohl/flatten v0.0.0-20190921043622-d936035e55cf // indirect
 	github.com/jessevdk/go-flags v1.6.1 // indirect
 	github.com/jinzhu/gorm v1.9.16 // indirect
@@ -129,7 +129,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.4 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/karlseguin/ccache v0.0.0-20181227155450-692cd618b264 // indirect
-	github.com/klauspost/compress v1.20.2 // indirect
+	github.com/klauspost/compress v1.20.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
