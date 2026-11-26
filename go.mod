@@ -3,8 +3,8 @@ module github.com/gosoline-project/kubrun
 go 1.25.7
 
 require (
-	github.com/gosoline-project/httpserver v0.6.5
-	github.com/justtrackio/gosoline v0.69.0
+	github.com/gosoline-project/httpserver v0.6.9-0.20261126111541-f0cbce27a933
+	github.com/justtrackio/gosoline v0.69.6-0.20261126111349-167371af9677
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
